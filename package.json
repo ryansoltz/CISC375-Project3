@@ -8,7 +8,7 @@
     },
     "contributors": ["Hadi Shaar"
     ],
-    "repository": {},
+    "repository": {"https://github.com/ryansoltz/CISC375-Project3"},
     "dependencies": {
         "express": "^4.18.2",
         "sqlite3": "^5.1.6"
