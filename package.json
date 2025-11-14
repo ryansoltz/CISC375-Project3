@@ -3,10 +3,10 @@
     "description": "REST Server",
     "version": "1.0.0",
     "author": {
-        "name": "",
-        "email": ""
+        "name": "Ryan Soltis",
+        "email": "solt4052@stthomas.edu"
     },
-    "contributors": [
+    "contributors": ["Hadi Shaar"
     ],
     "repository": {},
     "dependencies": {
