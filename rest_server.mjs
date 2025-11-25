@@ -1,100 +1,236 @@
-import * as path from 'node:path';
-import * as url from 'node:url';
+// rest_server.mjs
 
-import { default as express } from 'express';
-import { default as sqlite3 } from 'sqlite3';
+import express from "express";
+import sqlite3 from "sqlite3";
 
-const __dirname = path.dirname(url.fileURLToPath(import.meta.url));
-const db_filename = path.join(__dirname, 'db', 'stpaul_crime.sqlite3');
+// Create Express app
+const app = express();
+const PORT = 8000;
 
-const port = 8000;
-
-let app = express();
+// Enable JSON body parsing for PUT /new-incident
 app.use(express.json());
 
-/********************************************************************
- ***   DATABASE FUNCTIONS                                         *** 
- ********************************************************************/
-// Open SQLite3 database (in read-write mode)
-let db = new sqlite3.Database(db_filename, sqlite3.OPEN_READWRITE, (err) => {
+// Connect to SQLite database
+sqlite3.verbose();
+const db = new sqlite3.Database("./db/stpaul_crime.sqlite3", (err) => {
+  if (err) {
+    console.error("Error opening database:", err.message);
+  } else {
+    console.log("Connected to SQLite database.");
+  }
+});
+
+/**
+ * GET /codes
+ * Returns: [{ "code": 100, "type": "MURDER" }, ...]
+ */
+app.get("/codes", (req, res) => {
+  const sql = `
+    SELECT code, incident_type
+    FROM Codes
+    ORDER BY code;
+  `;
+
+  db.all(sql, [], (err, rows) => {
     if (err) {
-        console.log('Error opening ' + path.basename(db_filename));
+      console.error("GET /codes error:", err);
+      res.status(500).json({ error: "Database error" });
+      return;
     }
-    else {
-        console.log('Now connected to ' + path.basename(db_filename));
+
+    const result = rows.map((row) => ({
+      code: row.code,
+      type: row.incident_type,
+    }));
+
+    res.json(result);
+  });
+});
+
+/**
+ * GET /neighborhoods
+ * Returns: [{ "id": 1, "name": "Conway/Battlecreek/Highwood" }, ...]
+ */
+app.get("/neighborhoods", (req, res) => {
+  const sql = `
+    SELECT neighborhood_number, neighborhood_name
+    FROM Neighborhoods
+    ORDER BY neighborhood_number;
+  `;
+
+  db.all(sql, [], (err, rows) => {
+    if (err) {
+      console.error("GET /neighborhoods error:", err);
+      res.status(500).json({ error: "Database error" });
+      return;
     }
+
+    const result = rows.map((row) => ({
+      id: row.neighborhood_number,
+      name: row.neighborhood_name,
+    }));
+
+    res.json(result);
+  });
 });
 
-// Create Promise for SQLite3 database SELECT query 
-function dbSelect(query, params) {
-    return new Promise((resolve, reject) => {
-        db.all(query, params, (err, rows) => {
-            if (err) {
-                reject(err);
-            }
-            else {
-                resolve(rows);
-            }
-        });
+/**
+ * GET /incidents
+ * Returns: list of incidents, with date and time split
+ * [
+ *   {
+ *     "case_number": "19245020",
+ *     "date": "2019-10-30",
+ *     "time": "23:57:08",
+ *     "code": 9954,
+ *     "incident": "Proactive Police Visit",
+ *     "police_grid": 87,
+ *     "neighborhood_number": 7,
+ *     "block": "THOMAS AV  & VICTORIA"
+ *   },
+ *   ...
+ * ]
+ */
+app.get("/incidents", (req, res) => {
+  const sql = `
+    SELECT case_number, date_time, code, incident,
+           police_grid, neighborhood_number, block
+    FROM Incidents
+    ORDER BY date_time DESC;  -- most recent first
+  `;
+
+  db.all(sql, [], (err, rows) => {
+    if (err) {
+      console.error("GET /incidents error:", err);
+      res.status(500).json({ error: "Database error" });
+      return;
+    }
+
+    const result = rows.map((row) => {
+      // date_time format: "YYYY-MM-DD HH:MM:SS"
+      const dateTime = row.date_time || "";
+      const date = dateTime.slice(0, 10);  // "YYYY-MM-DD"
+      const time = dateTime.slice(11);     // "HH:MM:SS"
+
+      return {
+        case_number: row.case_number,
+        date,
+        time,
+        code: row.code,
+        incident: row.incident,
+        police_grid: row.police_grid,
+        neighborhood_number: row.neighborhood_number,
+        block: row.block,
+      };
     });
-}
 
-// Create Promise for SQLite3 database INSERT or DELETE query
-function dbRun(query, params) {
-    return new Promise((resolve, reject) => {
-        db.run(query, params, (err) => {
-            if (err) {
-                reject(err);
-            }
-            else {
-                resolve();
-            }
-        });
+    res.json(result);
+  });
+});
+
+/**
+ * PUT /new-incident
+ * Body JSON:
+ * {
+ *   "case_number": "TEST00001",
+ *   "date": "2019-10-30",
+ *   "time": "23:57:08",
+ *   "code": 700,
+ *   "incident": "Auto Theft",
+ *   "police_grid": 95,
+ *   "neighborhood_number": 4,
+ *   "block": "79X 6 ST E"
+ * }
+ *
+ * - 500 if case_number already exists
+ * - 400 if missing required fields
+ */
+app.put("/new-incident", (req, res) => {
+  const {
+    case_number,
+    date,
+    time,
+    code,
+    incident,
+    police_grid,
+    neighborhood_number,
+    block,
+  } = req.body;
+
+  // Basic validation: check required fields
+  if (
+    !case_number ||
+    !date ||
+    !time ||
+    code === undefined ||
+    !incident ||
+    police_grid === undefined ||
+    neighborhood_number === undefined ||
+    !block
+  ) {
+    res.status(400).json({ error: "Missing required fields" });
+    return;
+  }
+
+  const date_time = `${date} ${time}`; // "YYYY-MM-DD HH:MM:SS"
+
+  // 1) Check if case_number already exists
+  const checkSql = `
+    SELECT 1 FROM Incidents WHERE case_number = ?;
+  `;
+
+  db.get(checkSql, [case_number], (err, row) => {
+    if (err) {
+      console.error("PUT /new-incident check error:", err);
+      res.status(500).json({ error: "Database error" });
+      return;
+    }
+
+    if (row) {
+      // case_number already exists
+      res.status(500).json({ error: "Case number already exists" });
+      return;
+    }
+
+    // 2) Insert new incident
+    const insertSql = `
+      INSERT INTO Incidents
+      (case_number, date_time, code, incident,
+       police_grid, neighborhood_number, block)
+      VALUES (?, ?, ?, ?, ?, ?, ?);
+    `;
+
+    const params = [
+      case_number,
+      date_time,
+      code,
+      incident,
+      police_grid,
+      neighborhood_number,
+      block,
+    ];
+
+    db.run(insertSql, params, function (err2) {
+      if (err2) {
+        console.error("PUT /new-incident insert error:", err2);
+        res.status(500).json({ error: "Database error" });
+        return;
+      }
+
+      res.status(200).json({
+        status: "success",
+        case_number,
+      });
     });
-}
-
-/********************************************************************
- ***   REST REQUEST HANDLERS                                      *** 
- ********************************************************************/
-// GET request handler for crime codes
-app.get('/codes', (req, res) => {
-    console.log(req.query); // query object (key-value pairs after the ? in the url)
-    
-    res.status(200).type('json').send({}); // <-- you will need to change this
+  });
 });
 
-// GET request handler for neighborhoods
-app.get('/neighborhoods', (req, res) => {
-    console.log(req.query); // query object (key-value pairs after the ? in the url)
-    
-    res.status(200).type('json').send({}); // <-- you will need to change this
+// basic 404 handler
+app.use((req, res) => {
+  res.status(404).json({ error: "Not found" });
 });
 
-// GET request handler for crime incidents
-app.get('/incidents', (req, res) => {
-    console.log(req.query); // query object (key-value pairs after the ? in the url)
-    
-    res.status(200).type('json').send({}); // <-- you will need to change this
-});
-
-// PUT request handler for new crime incident
-app.put('/new-incident', (req, res) => {
-    console.log(req.body); // uploaded data
-    
-    res.status(200).type('txt').send('OK'); // <-- you may need to change this
-});
-
-// DELETE request handler for new crime incident
-app.delete('/remove-incident', (req, res) => {
-    console.log(req.body); // uploaded data
-    
-    res.status(200).type('txt').send('OK'); // <-- you may need to change this
-});
-
-/********************************************************************
- ***   START SERVER                                               *** 
- ********************************************************************/
-// Start server - listen for client connections
-app.listen(port, () => {
-    console.log('Now listening on port ' + port);
+// Start server
+app.listen(PORT, () => {
+  console.log(`Server listening on port ${PORT}`);
 });

@@ -1,16 +1,20 @@
 {
-    "name": "rest_server",
-    "description": "REST Server",
-    "version": "1.0.0",
-    "author": {
-        "name": "Ryan Soltis",
-        "email": "solt4052@stthomas.edu"
-    },
-    "contributors": ["Hadi Shaar"
-    ],
-    "repository": {"https://github.com/ryansoltz/CISC375-Project3"},
-    "dependencies": {
-        "express": "^4.18.2",
-        "sqlite3": "^5.1.6"
-    }
+  "name": "rest_server",
+  "description": "REST Server",
+  "version": "1.0.0",
+  "author": {
+    "name": "Ryan Soltis",
+    "email": "solt4052@stthomas.edu"
+  },
+  "contributors": [
+    "Hadi Shaar"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ryansoltz/CISC375-Project3.git"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "sqlite3": "^5.1.6"
+  }
 }
