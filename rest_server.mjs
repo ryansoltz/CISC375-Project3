@@ -140,7 +140,6 @@ app.get("/incidents", (req, res) => {
     let n = ""
     let s = ""
     let e = ""
-    let w = "WHERE "
     if (req.query.limit) {
       l = req.query.limit
     }
