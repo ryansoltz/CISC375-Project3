@@ -133,12 +133,8 @@ app.get("/neighborhoods", (req, res) => {
  * ]
  */
 app.get("/incidents", (req, res) => {
-  const sql = `
-    SELECT case_number, date_time, code, incident,
-           police_grid, neighborhood_number, block
-    FROM Incidents
-    ORDER BY date_time DESC;  -- most recent first
-  `;
+  /*
+  const sql = `SELECT case_number, date_time, code, incident, police_grid, neighborhood_number, block FROM Incidents ORDER BY date_time DESC`;
 
   db.all(sql, [], (err, rows) => {
     if (err) {
@@ -167,6 +163,56 @@ app.get("/incidents", (req, res) => {
 
     res.json(result);
   });
+  */
+    let l = "1000"
+    let c = ""
+    let g = ""
+    let n = ""
+    let w = "WHERE "
+    let flag = false;
+    if (req.query.limit) {
+      l = req.query.limit
+    }
+    if (req.query.code) {
+      flag = true
+      let arr = req.query.code.split(",");
+      for (let i = 0; i < arr.length; i++) {
+          c = c + "code = " + arr[i];
+          if (i !== arr.length-1) {
+            c = c + " OR "
+          }
+      } 
+    }
+    if (req.query.grid) {
+      flag = true
+      let arr = req.query.grid.split(",");
+      for (let i = 0; i < arr.length; i++) {
+          g = g + "police_grid = " + arr[i];
+          if (i !== arr.length-1) {
+            g = g + " OR "
+          }
+      } 
+    }
+    if (req.query.neighborhood) {
+      flag = true
+      let arr = req.query.neighborhood.split(",");
+      for (let i = 0; i < arr.length; i++) {
+          n = n + "neighborhood_number = " + arr[i];
+          if (i !== arr.length-1) {
+            n = n + " OR "
+          }
+      } 
+    }
+    if (!flag) {
+      w = ""
+    }
+    let sql = "SELECT case_number, date_time, code, incident, police_grid, neighborhood_number, block FROM Incidents " + w + c + g + n + " ORDER BY date_time DESC LIMIT " + l
+    db.all(sql, (err, rows) => {
+      if (err) {
+        return res.status(500).type("txt").send("SQL Error");
+      }
+      res.status(200).type("json").send(JSON.stringify(rows));
+    });
 });
 
 /**
