@@ -225,6 +225,33 @@ app.put("/new-incident", (req, res) => {
   });
 });
 
+
+app.delete("/remove-incident", (req, res) => {
+  if (req.body.case_number === undefined) {
+    return res.status(400).json({ error: "No case number provided." });
+  }
+  else {
+    let x = "SELECT * FROM Incidents where case_number = ?"
+    db.get(x, req.body.case_number, (err, row) => {
+        if (err) {
+          return res.status(500).type("txt").send("SQL Error");
+        }
+        if (!row) {
+          return res.status(500).type("txt").send("No such case.");
+        }   
+        let y = "DELETE FROM Incidents where case_number = ?"
+        db.run(y, req.body.case_number, (err, row) => {
+          if (err) {
+            return res.status(500).type("txt").send("SQL Error");
+          }
+          else {
+            return res.status(200).type("txt").send("Deleted case.");
+          }
+        });
+    });  
+  }
+});
+
 // basic 404 handler
 app.use((req, res) => {
   res.status(404).json({ error: "Not found" });
