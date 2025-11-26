@@ -25,26 +25,47 @@ const db = new sqlite3.Database("./db/stpaul_crime.sqlite3", (err) => {
  * Returns: [{ "code": 100, "type": "MURDER" }, ...]
  */
 app.get("/codes", (req, res) => {
-  const sql = `
-    SELECT code, incident_type
-    FROM Codes
-    ORDER BY code;
-  `;
 
-  db.all(sql, [], (err, rows) => {
-    if (err) {
-      console.error("GET /codes error:", err);
-      res.status(500).json({ error: "Database error" });
-      return;
+  if(!req.query.code) {
+    const sql = `
+      SELECT code, incident_type
+      FROM Codes
+      ORDER BY code;
+    `;
+
+    db.all(sql, [], (err, rows) => {
+      if (err) {
+        console.error("GET /codes error:", err);
+        res.status(500).json({ error: "Database error" });
+        return;
+      }
+
+      const result = rows.map((row) => ({
+        code: row.code,
+        type: row.incident_type,
+      }));
+
+      res.json(result);
+    });
+  }
+  else {
+    let arr = req.query.code.split(",");
+    let x = ""
+    for (let i = 0; i < arr.length; i++) {
+        x = x + "code = " + arr[i];
+        if (i !== arr.length-1) {
+          x = x + " OR "
+        }
     }
+    let y = "SELECT code, incident_type FROM Codes WHERE " + x + " ORDER BY code";
+    db.all(y, (err, rows) => {
+      if (err) {
+        return res.status(500).type("txt").send("SQL Error");
+      }
+      res.status(200).type("json").send(JSON.stringify(rows));
+    });
 
-    const result = rows.map((row) => ({
-      code: row.code,
-      type: row.incident_type,
-    }));
-
-    res.json(result);
-  });
+  }
 });
 
 /**
@@ -52,26 +73,46 @@ app.get("/codes", (req, res) => {
  * Returns: [{ "id": 1, "name": "Conway/Battlecreek/Highwood" }, ...]
  */
 app.get("/neighborhoods", (req, res) => {
-  const sql = `
-    SELECT neighborhood_number, neighborhood_name
-    FROM Neighborhoods
-    ORDER BY neighborhood_number;
-  `;
 
-  db.all(sql, [], (err, rows) => {
-    if (err) {
-      console.error("GET /neighborhoods error:", err);
-      res.status(500).json({ error: "Database error" });
-      return;
+  if (!req.query.id) {
+    const sql = `
+      SELECT neighborhood_number, neighborhood_name
+      FROM Neighborhoods
+      ORDER BY neighborhood_number;
+    `;
+
+    db.all(sql, [], (err, rows) => {
+      if (err) {
+        console.error("GET /neighborhoods error:", err);
+        res.status(500).json({ error: "Database error" });
+        return;
+      }
+
+      const result = rows.map((row) => ({
+        id: row.neighborhood_number,
+        name: row.neighborhood_name,
+      }));
+
+      res.json(result);
+    });
+  }
+  else {
+    let arr = req.query.id.split(",");
+    let x = ""
+    for (let i = 0; i < arr.length; i++) {
+        x = x + "neighborhood_number = " + arr[i];
+        if (i !== arr.length-1) {
+          x = x + " OR "
+        }
     }
-
-    const result = rows.map((row) => ({
-      id: row.neighborhood_number,
-      name: row.neighborhood_name,
-    }));
-
-    res.json(result);
-  });
+    let y = "SELECT neighborhood_number, neighborhood_name FROM Neighborhoods WHERE " + x + " ORDER BY neighborhood_number";
+    db.all(y, (err, rows) => {
+      if (err) {
+        return res.status(500).type("txt").send("SQL Error");
+      }
+      res.status(200).type("json").send(JSON.stringify(rows));
+    });
+  }
 });
 
 /**
@@ -227,7 +268,7 @@ app.put("/new-incident", (req, res) => {
 
 
 app.delete("/remove-incident", (req, res) => {
-  if (req.body.case_number === undefined) {
+  if (!req.body.case_number) {
     return res.status(400).json({ error: "No case number provided." });
   }
   else {
