@@ -133,80 +133,83 @@ app.get("/neighborhoods", (req, res) => {
  * ]
  */
 app.get("/incidents", (req, res) => {
-  /*
-  const sql = `SELECT case_number, date_time, code, incident, police_grid, neighborhood_number, block FROM Incidents ORDER BY date_time DESC`;
 
-  db.all(sql, [], (err, rows) => {
-    if (err) {
-      console.error("GET /incidents error:", err);
-      res.status(500).json({ error: "Database error" });
-      return;
-    }
-
-    const result = rows.map((row) => {
-      // date_time format: "YYYY-MM-DD HH:MM:SS"
-      const dateTime = row.date_time || "";
-      const date = dateTime.slice(0, 10);  // "YYYY-MM-DD"
-      const time = dateTime.slice(11);     // "HH:MM:SS"
-
-      return {
-        case_number: row.case_number,
-        date,
-        time,
-        code: row.code,
-        incident: row.incident,
-        police_grid: row.police_grid,
-        neighborhood_number: row.neighborhood_number,
-        block: row.block,
-      };
-    });
-
-    res.json(result);
-  });
-  */
     let l = "1000"
     let c = ""
     let g = ""
     let n = ""
+    let s = ""
+    let e = ""
     let w = "WHERE "
-    let flag = false;
     if (req.query.limit) {
       l = req.query.limit
     }
     if (req.query.code) {
-      flag = true
+      c = c + "("
       let arr = req.query.code.split(",");
       for (let i = 0; i < arr.length; i++) {
           c = c + "code = " + arr[i];
           if (i !== arr.length-1) {
             c = c + " OR "
           }
+          else {
+            c = c + ")"
+          }
       } 
     }
     if (req.query.grid) {
-      flag = true
+      g = g + "("
       let arr = req.query.grid.split(",");
       for (let i = 0; i < arr.length; i++) {
           g = g + "police_grid = " + arr[i];
           if (i !== arr.length-1) {
             g = g + " OR "
           }
+          else {
+            g = g + ")"
+          }
       } 
     }
     if (req.query.neighborhood) {
-      flag = true
       let arr = req.query.neighborhood.split(",");
+      n = n + "("
       for (let i = 0; i < arr.length; i++) {
           n = n + "neighborhood_number = " + arr[i];
           if (i !== arr.length-1) {
             n = n + " OR "
           }
+          else {
+            n = n + ")"
+          }
       } 
     }
-    if (!flag) {
-      w = ""
+
+    if (req.query.start_date) {
+      s = "date(date_time) >= '" + req.query.start_date + "'";   
     }
-    let sql = "SELECT case_number, date_time, code, incident, police_grid, neighborhood_number, block FROM Incidents " + w + c + g + n + " ORDER BY date_time DESC LIMIT " + l
+
+    if (req.query.end_date) {
+      e = "date(date_time) <= '" + req.query.end_date + "'";
+    }    
+    
+
+
+
+    let a = [];
+    if (c) a.push(c);
+    if (g) a.push(g);
+    if (n) a.push(n);
+    if (s) a.push(s);
+    if (e) a.push(e);  
+
+    let b = ""
+    if (a.length > 0) {
+      b = "WHERE " + a.join(" AND ")
+    }
+    
+    
+
+    let sql = "SELECT case_number, date_time, code, incident, police_grid, neighborhood_number, block FROM Incidents " + b + " ORDER BY date_time DESC LIMIT " + l
     db.all(sql, (err, rows) => {
       if (err) {
         return res.status(500).type("txt").send("SQL Error");
